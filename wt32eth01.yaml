@@ -1,4 +1,13 @@
 substitutions:
+  device_name: esp-185
+  friendly_name: blueriiot
+  description: "BlueRiiot Proxy"
+  device_area: Piscine
+
+  #blueriiot_mac: 00:A0:50:56:xx:xx
+  #blueriiot_nameprefix: mySwimingPool
+  #blueriiot_idprefix: p1
+
   blueriiot_mac: !secret blueriiot_mac
   blueriiot_name_prefix: !secret blueriiot_nameprefix
   blueriiot_id_prefix: !secret blueriiot_idprefix
@@ -10,49 +19,49 @@ substitutions:
   # notification is recieved on this Service ID                  
   blueriiot_recieve_service_uuid: 'F3300001-F0A2-9B06-0C59-1BC4763B5C00'
   blueriiot_recieve_characteristic_uuid: 'F3300003-F0A2-9B06-0C59-1BC4763B5C00'
-  
+
+#
 esphome:
-  name: wt32eth01
+  name: ${device_name}
+  area: ${device_area}
+
+# Packages :
+packages : 
+  wifi: !include common/wifi-iot.yaml
+  device_base: !include common/base.yaml
+  esp32: !include common/esp32.yaml
 
 esp32:
-  #board: wt32-eth01
-  #board: esp32dev
   board: esp-wrover-kit
   framework:
     type: arduino
 
-
 # Enable logging
 logger:
   #level: VERY_VERBOSE
+  #level: VERBOSE
   level: INFO
-  
+
+
+
+# for BLE
+wifi:
+  power_save_mode: LIGHT 
+
 # Enable Home Assistant API
 api:
   encryption:
-    key: !secret esphome_ha_api_key
+    key: !secret api_key_esp-185
 
-ota:
-  password: !secret esphome_ota_key
-
-ethernet:
-  type: LAN8720
-  mdc_pin: GPIO23
-  mdio_pin: GPIO18
-  clk_mode: GPIO0_IN
-  phy_addr: 1
-  power_pin: GPIO16
- 
-# Optional manual IP
-  manual_ip: x.x.x.x
-    static_ip: x.x.x.x
-    gateway: x.x.x.x
-    subnet: x.x.x.x
-    dns1: x.x.x.x
-
+web_server:
+  port: 80
 
 esp32_ble_tracker:
-
+  scan_parameters:
+    active: false
+    interval: 1000ms
+    window: 700ms
+  
 ble_client:
   - mac_address: ${blueriiot_mac}
     id: ble_client_${blueriiot_id_prefix}
@@ -63,124 +72,6 @@ ble_client:
         - button.press: button_${blueriiot_id_prefix}_doreading
     on_disconnect: [lambda: "id(binary_sensor_${blueriiot_id_prefix}_connected).publish_state(false);"]
 
-    
-binary_sensor:
-  - platform: gpio
-    pin: 
-      number: GPIO12
-      mode:
-        input: true
-        pulldown: true
-    filters:
-      - delayed_on: 100ms
-      - delayed_off: 100ms
-    name: "Zwembad Pomp Handmatig"
-##
-## Blue Connect    
-  - platform: template
-    id: binary_sensor_${blueriiot_id_prefix}_connected
-    name: ${blueriiot_name_prefix} Status
-    device_class: connectivity
-    entity_category: diagnostic
-
-##
-##
-switch:
-  - platform: gpio
-    pin: GPIO14
-    name: "Zwembad Pomp" 
-  - platform: gpio
-    pin: GPIO15
-    name: "Solarbol Klep"
-  - platform: ble_client
-    ble_client_id: ble_client_${blueriiot_id_prefix}
-    name: "${blueriiot_name_prefix} Enable"
-    id: switch_${blueriiot_id_prefix}_enable
-  
-dallas:
-  - pin: GPIO4
-
-sensor:
-  - platform: dallas
-    address: 0xce0000000f4f9c28
-    name: "Solarbol Aanvoer"
-  - platform: dallas
-    address: 0x3e00000010268928
-    name: "Solarbol Retour"
-
-  - platform: pulse_counter
-    name: "Zwembad Water Doorstroom"
-    pin: 
-      number: GPIO35
-    update_interval: 30s
-    filters:
-    - lambda: return (x / 288) * 60.0;
-    unit_of_measurement: "L/uur"
-
-  - platform: adc
-    pin: GPIO36
-    name: "Zwembad Zonlichtsterkte"
-    update_interval: 60s  
-    
-  - platform: template 
-    id: sensor_${blueriiot_id_prefix}_temperature
-    name: ${blueriiot_name_prefix} Temperature
-    # Optional variables:
-    unit_of_measurement: "°C"
-    icon: "mdi:water-percent"
-    device_class: "temperature"
-    state_class: "measurement"
-    accuracy_decimals: 1
-  
-  - platform: template 
-    id: sensor_${blueriiot_id_prefix}_ph
-    name: ${blueriiot_name_prefix} PH
-    # Optional variables:
-    #unit_of_measurement: "°C"
-    #icon: "mdi:water-percent"
-    #device_class: "temperature"
-    state_class: "measurement"
-    accuracy_decimals: 1
-
-  - platform: template 
-    id: sensor_${blueriiot_id_prefix}_orp
-    name: ${blueriiot_name_prefix} Chloor
-    # Optional variables:
-    #unit_of_measurement: "°C"
-    #icon: "mdi:water-percent"
-    device_class: "voltage"
-    state_class: "measurement"
-    accuracy_decimals: 1
-    
-  - platform: template 
-    id: sensor_${blueriiot_id_prefix}_bat
-    name: ${blueriiot_name_prefix} Battery
-    # Optional variables:
-    unit_of_measurement: "°C"
-    #icon: "mdi:water-percent"
-    device_class: "temperature"
-    state_class: "measurement"
-    accuracy_decimals: 1
-    
-  - platform: template 
-    id: sensor_${blueriiot_id_prefix}_salt
-    name: ${blueriiot_name_prefix} Salt
-    # Optional variables:
-    unit_of_measurement: "g/L"
-    icon: "mdi:water-percent"
-    state_class: "measurement"
-    accuracy_decimals: 1
-    
-  - platform: template 
-    id: sensor_${blueriiot_id_prefix}_cond
-    name: ${blueriiot_name_prefix} Conductivity
-    # Optional variables:
-    unit_of_measurement: "mS/cm"
-    #icon: "mdi:water-percent"
-    state_class: "measurement"
-    accuracy_decimals: 1
-    
-##
 ## Blue Connect
 button:
   - platform: template
@@ -196,8 +87,128 @@ button:
             # A lambda returning an std::vector<uint8_t>.
             value: !lambda |-
               return {0x01};
+##
+switch:
+  - platform: ble_client
+    ble_client_id: ble_client_${blueriiot_id_prefix}
+    name: "${blueriiot_name_prefix} Enable"
+    id: switch_${blueriiot_id_prefix}_enable
+    restore_mode: ALWAYS_OFF
+#              
+binary_sensor:  
+  - platform: template
+    id: binary_sensor_${blueriiot_id_prefix}_connected
+    name: ${blueriiot_name_prefix} Status
+    device_class: connectivity
+    entity_category: diagnostic
+
+  - platform: template
+    id: binary_sensor_${blueriiot_id_prefix}_ph
+    name: ${blueriiot_name_prefix} pH Status
+    # device_class: connectivity
+    entity_category: diagnostic
+  
+  - platform: template
+    id: binary_sensor_${blueriiot_id_prefix}_orp
+    name: ${blueriiot_name_prefix} Chlore Concentration
+    # device_class: connectivity
+    entity_category: diagnostic
+#
+sensor: 
+  - platform: template 
+    id: sensor_${blueriiot_id_prefix}_temperature
+    name: ${blueriiot_name_prefix} Temperature
+    # Optional variables:
+    unit_of_measurement: "°C"
+    icon: mdi:thermometer-water
+    device_class: "temperature"
+    state_class: "measurement"
+    accuracy_decimals: 1
+  
+  - platform: template 
+    id: sensor_${blueriiot_id_prefix}_ph
+    name: ${blueriiot_name_prefix} pH
+    unit_of_measurement: "pH"
+    icon: mdi:ph
+    state_class: "measurement"
+    accuracy_decimals: 1
+    on_value_range: 
+      - below: 7.29
+        then:
+          - binary_sensor.template.publish:
+              id: binary_sensor_${blueriiot_id_prefix}_ph
+              state: OFF
+      - above: 7.61
+        then:
+          - binary_sensor.template.publish:
+              id: binary_sensor_${blueriiot_id_prefix}_ph
+              state: OFF
+      - above: 7.3
+        below: 7.6
+        then:
+          - binary_sensor.template.publish:
+              id: binary_sensor_${blueriiot_id_prefix}_ph
+              state: ON
+  - platform: template 
+    id: sensor_${blueriiot_id_prefix}_orp
+    name: ${blueriiot_name_prefix} Chlore
+    unit_of_measurement: "mV"
+    #icon: "mdi:water-percent"
+    device_class: "voltage"
+    state_class: "measurement"
+    accuracy_decimals: 1
+    on_value_range:
+      - below: 649
+        then:
+          - binary_sensor.template.publish:
+              id: binary_sensor_${blueriiot_id_prefix}_orp
+              state: OFF
+      - above: 751
+        then:
+          - binary_sensor.template.publish:
+              id: binary_sensor_${blueriiot_id_prefix}_orp
+              state: OFF
+      - above: 650
+        below: 750
+        then:
+          - binary_sensor.template.publish:
+              id: binary_sensor_${blueriiot_id_prefix}_orp
+              state: ON
+  - platform: template 
+    id: sensor_${blueriiot_id_prefix}_bat
+    name: ${blueriiot_name_prefix} Batterie
+    # Optional variables:
+    unit_of_measurement: "°C"
+    icon: mdi:battery-bluetooth-variant
+    device_class: "temperature"
+    state_class: "measurement"
+    accuracy_decimals: 1
+    
+  - platform: template 
+    id: sensor_${blueriiot_id_prefix}_salt
+    name: ${blueriiot_name_prefix} Sel
+    # Optional variables:
+    unit_of_measurement: "g/L"
+    icon: mdi:shaker-outline
+    state_class: "measurement"
+    accuracy_decimals: 1
+    
+  - platform: template 
+    id: sensor_${blueriiot_id_prefix}_cond
+    name: ${blueriiot_name_prefix} Conductivité
+    # Optional variables:
+    unit_of_measurement: "µS/cm"
+    #icon: "mdi:water-percent"
+    state_class: "measurement"
+    accuracy_decimals: 1
+    
 
 text_sensor:
+  - platform: template
+    name: Blueriiot last update
+    id: uptime_blueriiot
+    update_interval: never
+    icon: mdi:clock-start
   - platform: ble_client
     id: ${blueriiot_id_prefix}_reading_data
     name: ${blueriiot_name_prefix} reading data
@@ -209,35 +220,45 @@ text_sensor:
     update_interval: never
     on_notify:
       then:
-       lambda: |-
-          std::string rawhex = format_hex_pretty((uint8_t *) x.c_str(), x.size()).c_str();
-          ESP_LOGD("raw_hex", "%s", rawhex.c_str());
+        - lambda: |-
+            std::string rawhex = format_hex_pretty((uint8_t *) x.c_str(), x.size()).c_str();
+            ESP_LOGD("raw_hex", "%s", rawhex.c_str());
 
-          float temperature = (float)((int16_t)(x[2]<< 8) + x[1])/100;
-          ESP_LOGD("temp", "%f", temperature);
-          id(sensor_${blueriiot_id_prefix}_temperature).publish_state(temperature);
-              
-          float raw_ph = (float)( (int16_t) (x[4]<< 8) + x[3]) ;
-          float ph = (float)( (int16_t) (2048 - raw_ph)) / 232  + 7 ; 
-          ESP_LOGD("ph", "%f", ph);
-          id(sensor_${blueriiot_id_prefix}_ph).publish_state(ph);
-          
-          float orp = (float)( (int16_t) (x[6]<< 8) + x[5]) / 3.86  - 21.57826;
-          ESP_LOGD("orp", "%f", orp);
-          id(sensor_${blueriiot_id_prefix}_orp).publish_state(orp);
-          
-          float salt = (float)( (int16_t) (x[8]<< 8) + x[7]) / 25.0;
-          ESP_LOGD("salt", "%f", salt);
-          id(sensor_${blueriiot_id_prefix}_salt).publish_state(salt);
-          
-          float cond = (float)( (int16_t) (x[10]<< 8) + x[9]) / 0.4134;
-          ESP_LOGD("cond", "%f", cond);
-          id(sensor_${blueriiot_id_prefix}_cond).publish_state(cond);
-          
-          float bat = (float)( (int16_t) x[11]);
-          ESP_LOGD("bat", "%f", bat);
-          id(sensor_${blueriiot_id_prefix}_bat).publish_state(bat);
-          
-          
-          
-          id(switch_${blueriiot_id_prefix}_enable).turn_off();
+            float temperature = (float)((int16_t)(x[2]<< 8) + x[1])/100;
+            ESP_LOGD("temp", "%f", temperature);
+            id(sensor_${blueriiot_id_prefix}_temperature).publish_state(temperature);
+                
+            float raw_ph = (float)( (int16_t) (x[4]<< 8) + x[3]) ;
+            float ph = (float)( (int16_t) (2048 - raw_ph)) / 232  + 7 ; 
+            ESP_LOGD("ph", "%f", ph);
+            id(sensor_${blueriiot_id_prefix}_ph).publish_state(ph);
+            
+            float orp = (float)( (int16_t) (x[6]<< 8) + x[5]) / 3.86  - 21.57826;
+            ESP_LOGD("orp", "%f", orp);
+            id(sensor_${blueriiot_id_prefix}_orp).publish_state(orp);
+            
+            float salt = (float)( (int16_t) (x[8]<< 8) + x[7]) / 25.0;
+            ESP_LOGD("salt", "%f", salt);
+            id(sensor_${blueriiot_id_prefix}_salt).publish_state(salt);
+            
+            float cond = (float)( (int16_t) (x[10]<< 8) + x[9]) / 0.4134;
+            ESP_LOGD("cond", "%f", cond);
+            id(sensor_${blueriiot_id_prefix}_cond).publish_state(cond);
+            
+            float bat = (float)( (int16_t) x[11]);
+            ESP_LOGD("bat", "%f", bat);
+            id(sensor_${blueriiot_id_prefix}_bat).publish_state(bat);
+            
+            id(switch_${blueriiot_id_prefix}_enable).turn_off();
+
+        - text_sensor.template.publish:
+            id: uptime_blueriiot
+            state: !lambda |-
+              int seconds = (id(uptime_sensor).state);
+              int days = seconds / (24 * 3600);
+              seconds = seconds % (24 * 3600); 
+              int hours = seconds / 3600;
+              seconds = seconds % 3600;
+              int minutes = seconds /  60;
+              seconds = seconds % 60;
+              return { (String(days) +"d " + String(hours) +"h " + String(minutes) +"m "+ String(seconds) +"s").c_str() };
