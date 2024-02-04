@@ -42,8 +42,6 @@ logger:
   #level: VERBOSE
   level: INFO
 
-
-
 # for BLE
 wifi:
   power_save_mode: LIGHT 
@@ -106,13 +104,13 @@ binary_sensor:
     id: binary_sensor_${blueriiot_id_prefix}_ph
     name: ${blueriiot_name_prefix} pH Status
     # device_class: connectivity
-    entity_category: diagnostic
+    # entity_category: diagnostic
   
   - platform: template
     id: binary_sensor_${blueriiot_id_prefix}_orp
     name: ${blueriiot_name_prefix} Chlore Concentration
     # device_class: connectivity
-    entity_category: diagnostic
+    # entity_category: diagnostic
 #
 sensor: 
   - platform: template 
@@ -131,6 +129,7 @@ sensor:
     unit_of_measurement: "pH"
     icon: mdi:ph
     state_class: "measurement"
+    device_class: "PH"
     accuracy_decimals: 1
     on_value_range: 
       - below: 7.29
@@ -178,15 +177,15 @@ sensor:
     id: sensor_${blueriiot_id_prefix}_bat
     name: ${blueriiot_name_prefix} Batterie
     # Optional variables:
-    unit_of_measurement: "°C"
+    #unit_of_measurement: "%"
     icon: mdi:battery-bluetooth-variant
-    device_class: "temperature"
+    device_class: "BATTERY"
     state_class: "measurement"
     accuracy_decimals: 1
     
   - platform: template 
     id: sensor_${blueriiot_id_prefix}_salt
-    name: ${blueriiot_name_prefix} Sel
+    name: ${blueriiot_name_prefix} Salinité
     # Optional variables:
     unit_of_measurement: "g/L"
     icon: mdi:shaker-outline
@@ -250,15 +249,3 @@ text_sensor:
             id(sensor_${blueriiot_id_prefix}_bat).publish_state(bat);
             
             id(switch_${blueriiot_id_prefix}_enable).turn_off();
-
-        - text_sensor.template.publish:
-            id: uptime_blueriiot
-            state: !lambda |-
-              int seconds = (id(uptime_sensor).state);
-              int days = seconds / (24 * 3600);
-              seconds = seconds % (24 * 3600); 
-              int hours = seconds / 3600;
-              seconds = seconds % 3600;
-              int minutes = seconds /  60;
-              seconds = seconds % 60;
-              return { (String(days) +"d " + String(hours) +"h " + String(minutes) +"m "+ String(seconds) +"s").c_str() };
