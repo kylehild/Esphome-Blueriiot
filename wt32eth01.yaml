@@ -1,8 +1,10 @@
 substitutions:
-  device_name: esp-185
-  friendly_name: blueriiot
+  device_name: piscine-182
+  friendly_name: piscine-182
   description: "BlueRiiot Proxy"
   device_area: Piscine
+  board: esp32-poe-iso
+
 
   #blueriiot_mac: 00:A0:50:56:xx:xx
   #blueriiot_nameprefix: mySwimingPool
@@ -20,46 +22,66 @@ substitutions:
   blueriiot_recieve_service_uuid: 'F3300001-F0A2-9B06-0C59-1BC4763B5C00'
   blueriiot_recieve_characteristic_uuid: 'F3300003-F0A2-9B06-0C59-1BC4763B5C00'
 
+# =====================
+# rev 2024-06-26
 #
+# Salt revision 
+# from :             # float salt = (float)( (int16_t) (x[8]<< 8) + x[7]) / 25.0;
+# to :              #float salt = (float)( -1.828 * log(( ((int16_t)(x[8]<< 8) + x[7]) * log(temperature)) - 197.369) + 14.076 );
+# Bat revision
+# from : float bat = (float)( (int16_t) x[11]) ;
+# to : float bat = (float)( (int16_t) x[11]) / 36 * 100;
+# =====================
+
 esphome:
   name: ${device_name}
   area: ${device_area}
 
+esp32:
+  board: ${board}
+  framework:
+    type: esp-idf
+    #version: 5.1.2
+    #version: latest
+    # platform_version: 6.5.0
+    #sdkconfig_options:
+    #  COMPILER_OPTIMIZATION_SIZE: y  
+    #  CONFIG_ESPTOOLPY_FLASHSIZE_4MB: y
+
 # Packages :
 packages : 
-  wifi: !include common/wifi-iot.yaml
+  #wifi: !include common/wifi-iot.yaml
   device_base: !include common/base.yaml
-  esp32: !include common/esp32.yaml
-
-esp32:
-  board: esp-wrover-kit
-  framework:
-    type: arduino
+  ethernet: !include common/ethernet.yaml
+  network-service: !include common/network-service.yaml
 
 # Enable logging
 logger:
-  #level: VERY_VERBOSE
-  #level: VERBOSE
-  level: INFO
-
-# for BLE
-wifi:
-  power_save_mode: LIGHT 
+    level: INFO
 
 # Enable Home Assistant API
 api:
   encryption:
-    key: !secret api_key_esp-185
+    key: !secret api_key_esp-182
 
-web_server:
-  port: 80
+ota:
+  - platform: esphome
+    password: !secret ota_esp-182
+
+#====================
 
 esp32_ble_tracker:
   scan_parameters:
     active: false
     interval: 1000ms
     window: 700ms
-  
+  on_ble_advertise:
+    - mac_address: ${blueriiot_mac}
+      then:
+        - logger.log: 
+            format: "Found Blueriiot sensor"
+            level: "DEBUG"
+
 ble_client:
   - mac_address: ${blueriiot_mac}
     id: ble_client_${blueriiot_id_prefix}
@@ -70,6 +92,19 @@ ble_client:
         - button.press: button_${blueriiot_id_prefix}_doreading
     on_disconnect: [lambda: "id(binary_sensor_${blueriiot_id_prefix}_connected).publish_state(false);"]
 
+# esp32_ble_tracker:
+#   scan_parameters:
+#     active: false
+#     interval: 1000ms
+#     window: 700ms
+#   on_ble_advertise:
+#     - mac_address: ${blueriiot_mac}
+#       then:
+#         - logger.log: 
+#             format: "Found Blueriiot sensor"
+#             level: "DEBUG"
+
+# ----------
 ## Blue Connect
 button:
   - platform: template
@@ -100,15 +135,21 @@ binary_sensor:
     device_class: connectivity
     entity_category: diagnostic
 
-  - platform: template
+  - platform: status
     id: binary_sensor_${blueriiot_id_prefix}_ph
     name: ${blueriiot_name_prefix} pH Status
     # device_class: connectivity
     # entity_category: diagnostic
   
-  - platform: template
+  - platform: status
     id: binary_sensor_${blueriiot_id_prefix}_orp
     name: ${blueriiot_name_prefix} Chlore Concentration
+    # device_class: connectivity
+    # entity_category: diagnostic
+      
+  - platform: status
+    id: binary_sensor_${blueriiot_id_prefix}_salt
+    name: ${blueriiot_name_prefix} Salinité
     # device_class: connectivity
     # entity_category: diagnostic
 #
@@ -152,7 +193,7 @@ sensor:
     id: sensor_${blueriiot_id_prefix}_orp
     name: ${blueriiot_name_prefix} Chlore
     unit_of_measurement: "mV"
-    #icon: "mdi:water-percent"
+    icon: mdi:biohazard
     device_class: "voltage"
     state_class: "measurement"
     accuracy_decimals: 1
@@ -162,13 +203,13 @@ sensor:
           - binary_sensor.template.publish:
               id: binary_sensor_${blueriiot_id_prefix}_orp
               state: OFF
-      - above: 751
+      - above: 900
         then:
           - binary_sensor.template.publish:
               id: binary_sensor_${blueriiot_id_prefix}_orp
               state: OFF
       - above: 650
-        below: 750
+        below: 899
         then:
           - binary_sensor.template.publish:
               id: binary_sensor_${blueriiot_id_prefix}_orp
@@ -177,11 +218,11 @@ sensor:
     id: sensor_${blueriiot_id_prefix}_bat
     name: ${blueriiot_name_prefix} Batterie
     # Optional variables:
-    #unit_of_measurement: "%"
+    unit_of_measurement: "%"
     icon: mdi:battery-bluetooth-variant
     device_class: "BATTERY"
     state_class: "measurement"
-    accuracy_decimals: 1
+    accuracy_decimals: 0
     
   - platform: template 
     id: sensor_${blueriiot_id_prefix}_salt
@@ -191,17 +232,31 @@ sensor:
     icon: mdi:shaker-outline
     state_class: "measurement"
     accuracy_decimals: 1
+    on_value:
+      if: 
+        condition:
+          sensor.in_range:
+            id: sensor_${blueriiot_id_prefix}_salt
+            above: 3
+            below: 4.99
+        then:
+            - binary_sensor.template.publish:
+                id: binary_sensor_${blueriiot_id_prefix}_salt
+                state: ON
+        else:
+            - binary_sensor.template.publish:
+                id: binary_sensor_${blueriiot_id_prefix}_salt
+                state: OFF
     
   - platform: template 
     id: sensor_${blueriiot_id_prefix}_cond
     name: ${blueriiot_name_prefix} Conductivité
     # Optional variables:
     unit_of_measurement: "µS/cm"
-    #icon: "mdi:water-percent"
+    icon: mdi:blur
     state_class: "measurement"
     accuracy_decimals: 1
     
-
 text_sensor:
   - platform: template
     name: Blueriiot last update
@@ -236,7 +291,7 @@ text_sensor:
             ESP_LOGD("orp", "%f", orp);
             id(sensor_${blueriiot_id_prefix}_orp).publish_state(orp);
             
-            float salt = (float)( (int16_t) (x[8]<< 8) + x[7]) / 25.0;
+            float salt = (float)( -1.828 * log(( ((int16_t)(x[8]<< 8) + x[7]) * log(temperature)) - 197.369) + 14.076 );
             ESP_LOGD("salt", "%f", salt);
             id(sensor_${blueriiot_id_prefix}_salt).publish_state(salt);
             
@@ -244,8 +299,14 @@ text_sensor:
             ESP_LOGD("cond", "%f", cond);
             id(sensor_${blueriiot_id_prefix}_cond).publish_state(cond);
             
-            float bat = (float)( (int16_t) x[11]);
+            float bat = (float)( (int16_t) x[11]) / 36 * 100;
             ESP_LOGD("bat", "%f", bat);
             id(sensor_${blueriiot_id_prefix}_bat).publish_state(bat);
             
             id(switch_${blueriiot_id_prefix}_enable).turn_off();
+
+#
+# 
+#
+#
+
