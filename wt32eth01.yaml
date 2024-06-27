@@ -1,9 +1,10 @@
 substitutions:
-  device_name: piscine-182
-  friendly_name: piscine-182
+  device_name: piscine-${octet1}
+  friendly_name: piscine-${octet1}
   description: "BlueRiiot Proxy"
   device_area: Piscine
   board: esp32-poe-iso
+  octet1: "182"
 
 
   #blueriiot_mac: 00:A0:50:56:xx:xx
@@ -65,8 +66,8 @@ api:
     key: !secret api_key_esp-182
 
 ota:
-  - platform: esphome
-    password: !secret ota_esp-182
+   - platform: esphome
+     password: !secret ota_password
 
 #====================
 
@@ -304,9 +305,10 @@ text_sensor:
             id(sensor_${blueriiot_id_prefix}_bat).publish_state(bat);
             
             id(switch_${blueriiot_id_prefix}_enable).turn_off();
-
+        - text_sensor.template.publish:
+                id: uptime_blueriiot
+                state: !lambda |-
+                  return  id(homeassistant_time).now().strftime("%Y-%m-%d %H:%M");;
 #
 # 
 #
-#
-
