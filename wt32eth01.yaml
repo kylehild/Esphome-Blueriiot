@@ -136,23 +136,6 @@ binary_sensor:
     device_class: connectivity
     entity_category: diagnostic
 
-  - platform: status
-    id: binary_sensor_${blueriiot_id_prefix}_ph
-    name: ${blueriiot_name_prefix} pH Status
-    # device_class: connectivity
-    # entity_category: diagnostic
-  
-  - platform: status
-    id: binary_sensor_${blueriiot_id_prefix}_orp
-    name: ${blueriiot_name_prefix} Chlore Concentration
-    # device_class: connectivity
-    # entity_category: diagnostic
-      
-  - platform: status
-    id: binary_sensor_${blueriiot_id_prefix}_salt
-    name: ${blueriiot_name_prefix} Salinité
-    # device_class: connectivity
-    # entity_category: diagnostic
 #
 sensor: 
   - platform: template 
@@ -174,22 +157,22 @@ sensor:
     device_class: "PH"
     accuracy_decimals: 1
     on_value_range: 
-      - below: 7.29
+      - below: 7.2
         then:
-          - binary_sensor.template.publish:
-              id: binary_sensor_${blueriiot_id_prefix}_ph
-              state: OFF
-      - above: 7.61
+          - text_sensor.template.publish:
+              id: text_sensor_${blueriiot_id_prefix}_ph
+              state: "LOW"
+      - above: 7.6
         then:
-          - binary_sensor.template.publish:
-              id: binary_sensor_${blueriiot_id_prefix}_ph
-              state: OFF
-      - above: 7.3
-        below: 7.6
+          - text_sensor.template.publish:
+              id: text_sensor_${blueriiot_id_prefix}_ph
+              state: "HIGH"
+      - above: 7.201
+        below: 7.599
         then:
-          - binary_sensor.template.publish:
-              id: binary_sensor_${blueriiot_id_prefix}_ph
-              state: ON
+          - text_sensor.template.publish:
+              id: text_sensor_${blueriiot_id_prefix}_ph
+              state: "Good"
   - platform: template 
     id: sensor_${blueriiot_id_prefix}_orp
     name: ${blueriiot_name_prefix} Chlore
@@ -201,20 +184,20 @@ sensor:
     on_value_range:
       - below: 649
         then:
-          - binary_sensor.template.publish:
-              id: binary_sensor_${blueriiot_id_prefix}_orp
-              state: OFF
+          - text_sensor.template.publish:
+              id: text_sensor_${blueriiot_id_prefix}_orp
+              state: "LOW"
       - above: 900
         then:
-          - binary_sensor.template.publish:
-              id: binary_sensor_${blueriiot_id_prefix}_orp
-              state: OFF
+          - text_sensor.template.publish:
+              id: text_sensor_${blueriiot_id_prefix}_orp
+              state: "HIGH"
       - above: 650
         below: 899
         then:
-          - binary_sensor.template.publish:
-              id: binary_sensor_${blueriiot_id_prefix}_orp
-              state: ON
+          - text_sensor.template.publish:
+              id: text_sensor_${blueriiot_id_prefix}_orp
+              state: "Good"
   - platform: template 
     id: sensor_${blueriiot_id_prefix}_bat
     name: ${blueriiot_name_prefix} Batterie
@@ -229,26 +212,27 @@ sensor:
     id: sensor_${blueriiot_id_prefix}_salt
     name: ${blueriiot_name_prefix} Salinité
     # Optional variables:
-    unit_of_measurement: "g/L"
+    unit_of_measurement: "g/l"
     icon: mdi:shaker-outline
     state_class: "measurement"
     accuracy_decimals: 1
-    on_value:
-      if: 
-        condition:
-          sensor.in_range:
-            id: sensor_${blueriiot_id_prefix}_salt
-            above: 1.8
-            below: 3.1
+    on_value_range:
+      - below: 2.5
         then:
-            - binary_sensor.template.publish:
-                id: binary_sensor_${blueriiot_id_prefix}_salt
-                state: ON
-        else:
-            - binary_sensor.template.publish:
-                id: binary_sensor_${blueriiot_id_prefix}_salt
-                state: OFF
-    
+          - text_sensor.template.publish:
+              id: text_sensor_${blueriiot_id_prefix}_salt
+              state: "Low"
+      - above: 4.0
+        then:
+          - text_sensor.template.publish:
+              id: text_sensor_${blueriiot_id_prefix}_salt
+              state: "High"
+      - above: 2.51
+        below: 3.99
+        then:
+          - text_sensor.template.publish:
+              id: text_sensor_${blueriiot_id_prefix}_salt
+              state: "Good"
   - platform: template 
     id: sensor_${blueriiot_id_prefix}_cond
     name: ${blueriiot_name_prefix} Conductivité
@@ -259,6 +243,15 @@ sensor:
     accuracy_decimals: 0
     
 text_sensor:
+  - platform: template
+    id: text_sensor_${blueriiot_id_prefix}_salt
+    name: ${blueriiot_name_prefix} Salinité Status
+  - platform: template
+    id: text_sensor_${blueriiot_id_prefix}_ph
+    name: ${blueriiot_name_prefix} pH Status
+  - platform: template
+    id: text_sensor_${blueriiot_id_prefix}_orp
+    name: ${blueriiot_name_prefix} Chlore Concentration Status
   - platform: template
     name: Blueriiot last update
     id: uptime_blueriiot
