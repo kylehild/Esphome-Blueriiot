@@ -1,11 +1,9 @@
 substitutions:
-  device_name: piscine-${octet1}
-  friendly_name: piscine-${octet1}
+  device_name: hot-tub-monitor
+  friendly_name: "Hot Tub Monitor"
   description: "BlueRiiot Proxy"
-  device_area: Piscine
-  board: esp32-poe-iso
-  octet1: "182"
-
+  device_area: Patio
+  board: nodemcu-32s
 
   #blueriiot_mac: 00:A0:50:56:xx:xx
   #blueriiot_nameprefix: mySwimingPool
@@ -23,26 +21,6 @@ substitutions:
   blueriiot_recieve_service_uuid: 'F3300001-F0A2-9B06-0C59-1BC4763B5C00'
   blueriiot_recieve_characteristic_uuid: 'F3300003-F0A2-9B06-0C59-1BC4763B5C00'
 
-# =====================
-# rev 2024-06-26
-#
-# Salt revision 
-# from :             # float salt = (float)( (int16_t) (x[8]<< 8) + x[7]) / 25.0;
-# to :              #float salt = (float)( -1.828 * log(( ((int16_t)(x[8]<< 8) + x[7]) * log(temperature)) - 197.369) + 14.076 );
-# Bat revision
-# from : float bat = (float)( (int16_t) x[11]) ;
-# to : float bat = (float)( (int16_t) x[11]) / 37 * 100;
-# to : float bat = (float)( (int16_t) x[11]) / 36 * 100;
-# =====================
-# rev 2024-08-23
-#
-# Salt revision 
-# from :              #float salt = (float)( -1.828 * log(( ((int16_t)(x[8]<< 8) + x[7]) * log(temperature)) - 197.369) + 14.076 );
-# to : float salt = (float) (int16_t) 1 / (raw_cond * 0.001) * 1.0615 * 500 / 1000 ;
-# Conductivity
-# from : float cond = (float)( (int16_t) (x[10]<< 8) + x[9]) / 0.4134;
-# to  : float cond = (float) (int16_t) 1 / (raw_cond * 0.000001) * 1.0615 ;
-# =====================
 esphome:
   name: ${device_name}
   area: ${device_area}
@@ -58,25 +36,30 @@ esp32:
     #  COMPILER_OPTIMIZATION_SIZE: y  
     #  CONFIG_ESPTOOLPY_FLASHSIZE_4MB: y
 
-# Packages :
-packages : 
-  #wifi: !include common/wifi-iot.yaml
-  device_base: !include common/base.yaml
-  ethernet: !include common/ethernet.yaml
-  network-service: !include common/network-service.yaml
-
 # Enable logging
 logger:
-    level: INFO
+    level: DEBUG
 
 # Enable Home Assistant API
 api:
   encryption:
-    key: !secret api_key_esp-182
+    key: !secret api_key
 
 ota:
    - platform: esphome
      password: !secret ota_password
+
+wifi:
+  ssid: !secret wifi_ssid
+  password: !secret wifi_password
+
+  # Enable fallback hotspot (captive portal) in case wifi connection fails
+  ap:
+    ssid: "Hot-Tub-Monitor Fallback Hotspot"
+    password: !secret fallback_wifi_password
+
+captive_portal:
+
 
 #====================
 
@@ -97,9 +80,6 @@ ble_client:
     id: ble_client_${blueriiot_id_prefix}
     on_connect: 
       then:
-        - logger.log: 
-            format: "Connected to Blueriiot sensor"
-            level: "INFO"
         - lambda: "id(binary_sensor_${blueriiot_id_prefix}_connected).publish_state(true);"
         - delay: 2s
         - button.press: button_${blueriiot_id_prefix}_doreading
@@ -136,7 +116,18 @@ binary_sensor:
     device_class: connectivity
     entity_category: diagnostic
 
-#
+  - platform: status
+    id: binary_sensor_${blueriiot_id_prefix}_ph
+    name: ${blueriiot_name_prefix} pH Status
+    # device_class: connectivity
+    # entity_category: diagnostic
+  
+  - platform: status
+    id: binary_sensor_${blueriiot_id_prefix}_orp
+    name: ${blueriiot_name_prefix} Bromine Concentration
+    # device_class: connectivity
+    # entity_category: diagnostic
+      
 sensor: 
   - platform: template 
     id: sensor_${blueriiot_id_prefix}_temperature
@@ -157,25 +148,25 @@ sensor:
     device_class: "PH"
     accuracy_decimals: 1
     on_value_range: 
-      - below: 7.2
+      - below: 7.29
         then:
-          - text_sensor.template.publish:
-              id: text_sensor_${blueriiot_id_prefix}_ph
-              state: "LOW"
-      - above: 7.6
+          - binary_sensor.template.publish:
+              id: binary_sensor_${blueriiot_id_prefix}_ph
+              state: OFF
+      - above: 7.61
         then:
-          - text_sensor.template.publish:
-              id: text_sensor_${blueriiot_id_prefix}_ph
-              state: "HIGH"
-      - above: 7.201
-        below: 7.599
+          - binary_sensor.template.publish:
+              id: binary_sensor_${blueriiot_id_prefix}_ph
+              state: OFF
+      - above: 7.3
+        below: 7.6
         then:
-          - text_sensor.template.publish:
-              id: text_sensor_${blueriiot_id_prefix}_ph
-              state: "Good"
+          - binary_sensor.template.publish:
+              id: binary_sensor_${blueriiot_id_prefix}_ph
+              state: ON
   - platform: template 
     id: sensor_${blueriiot_id_prefix}_orp
-    name: ${blueriiot_name_prefix} Chlore
+    name: ${blueriiot_name_prefix} Bromine
     unit_of_measurement: "mV"
     icon: mdi:biohazard
     device_class: "voltage"
@@ -184,23 +175,23 @@ sensor:
     on_value_range:
       - below: 649
         then:
-          - text_sensor.template.publish:
-              id: text_sensor_${blueriiot_id_prefix}_orp
-              state: "LOW"
+          - binary_sensor.template.publish:
+              id: binary_sensor_${blueriiot_id_prefix}_orp
+              state: OFF
       - above: 900
         then:
-          - text_sensor.template.publish:
-              id: text_sensor_${blueriiot_id_prefix}_orp
-              state: "HIGH"
+          - binary_sensor.template.publish:
+              id: binary_sensor_${blueriiot_id_prefix}_orp
+              state: OFF
       - above: 650
         below: 899
         then:
-          - text_sensor.template.publish:
-              id: text_sensor_${blueriiot_id_prefix}_orp
-              state: "Good"
+          - binary_sensor.template.publish:
+              id: binary_sensor_${blueriiot_id_prefix}_orp
+              state: ON
   - platform: template 
     id: sensor_${blueriiot_id_prefix}_bat
-    name: ${blueriiot_name_prefix} Batterie
+    name: ${blueriiot_name_prefix} Battery
     # Optional variables:
     unit_of_measurement: "%"
     icon: mdi:battery-bluetooth-variant
@@ -208,50 +199,7 @@ sensor:
     state_class: "measurement"
     accuracy_decimals: 0
     
-  - platform: template 
-    id: sensor_${blueriiot_id_prefix}_salt
-    name: ${blueriiot_name_prefix} Salinité
-    # Optional variables:
-    unit_of_measurement: "g/l"
-    icon: mdi:shaker-outline
-    state_class: "measurement"
-    accuracy_decimals: 1
-    on_value_range:
-      - below: 2.5
-        then:
-          - text_sensor.template.publish:
-              id: text_sensor_${blueriiot_id_prefix}_salt
-              state: "Low"
-      - above: 4.0
-        then:
-          - text_sensor.template.publish:
-              id: text_sensor_${blueriiot_id_prefix}_salt
-              state: "High"
-      - above: 2.51
-        below: 3.99
-        then:
-          - text_sensor.template.publish:
-              id: text_sensor_${blueriiot_id_prefix}_salt
-              state: "Good"
-  - platform: template 
-    id: sensor_${blueriiot_id_prefix}_cond
-    name: ${blueriiot_name_prefix} Conductivité
-    # Optional variables:
-    unit_of_measurement: "µS/cm"
-    icon: "mdi:water-sync"
-    state_class: "measurement"
-    accuracy_decimals: 0
-    
 text_sensor:
-  - platform: template
-    id: text_sensor_${blueriiot_id_prefix}_salt
-    name: ${blueriiot_name_prefix} Salinité Status
-  - platform: template
-    id: text_sensor_${blueriiot_id_prefix}_ph
-    name: ${blueriiot_name_prefix} pH Status
-  - platform: template
-    id: text_sensor_${blueriiot_id_prefix}_orp
-    name: ${blueriiot_name_prefix} Chlore Concentration Status
   - platform: template
     name: Blueriiot last update
     id: uptime_blueriiot
@@ -285,26 +233,8 @@ text_sensor:
             ESP_LOGD("orp", "%f", orp);
             id(sensor_${blueriiot_id_prefix}_orp).publish_state(orp);
             
-            float raw_cond = (float)( (int16_t) (x[8]<< 8) + x[7]);
-
-            float salt = (float) (int16_t) 1 / (raw_cond * 0.001) * 1.0615 * 500 / 1000 ;
-            ESP_LOGD("salt", "%f", salt);
-            id(sensor_${blueriiot_id_prefix}_salt).publish_state(salt);
-            
-            float cond = (float) (int16_t) 1 / (raw_cond * 0.000001) * 1.0615 ;
-            ESP_LOGD("cond", "%f", cond);
-            id(sensor_${blueriiot_id_prefix}_cond).publish_state(cond);
-            
             float bat = (float)( (int16_t) x[11]) / 36 * 100;
             ESP_LOGD("bat", "%f", bat);
             id(sensor_${blueriiot_id_prefix}_bat).publish_state(bat);
             
             id(switch_${blueriiot_id_prefix}_enable).turn_off();
-        - text_sensor.template.publish:
-                id: uptime_blueriiot
-                state: !lambda |-
-                  return  id(homeassistant_time).now().strftime("%Y-%m-%d %H:%M");
-#
-# 
-#
-#
